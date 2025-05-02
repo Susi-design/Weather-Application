@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Weather App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to right, #6dd5fa, #2980b9);
+            padding-top: 50px;
+            transition: background 0.5s ease-in-out;
+        }
+        .container {
+            text-align: center;
+            background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            width: 300px;
+            color: white;
+            position: relative;
+        }
+        .search {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            display: flex;
+            justify-content: space-between;
+            background: white;
+            padding: 10px;
+            border-radius: 30px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        input {
+            padding: 10px;
+            width: 80%;
+            border: none;
+            outline: none;
+            border-radius: 20px;
+        }
+        button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        .weather-info {
+            margin-top: 50px;
+        }
+        .weather-info .icon img {
+            width: 100px;
+        }
+        .weather-info .temperature {
+            font-size: 50px;
+            font-weight: bold;
+        }
+        .weather-info .city {
+            font-size: 25px;
+            font-weight: 300;
+        }
+        .additional-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .additional-info div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .additional-info div p {
+            margin: 5px 0;
+        }
+        .icon, .humidity, .wind-speed {
+            font-size: 20px;
+        }
+        .uv-index, .pressure, .visibility, .description {
+            font-size: 20px;
+            margin-top: 10px;
+        }
+        .temp-toggle {
+            margin-top: 20px;
+            cursor: pointer;
+            color: #fff;
+        }
+        .date-time {
+            margin-top: 10px;
+            font-size: 18px;
+        }
+        .favorites {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .favorites button {
+            margin-top: 5px;
+            background: #fff;
+            color: #2980b9;
+            padding: 5px;
+            border-radius: 20px;
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search">
+            <input type="text" id="city" placeholder="Enter city name">
+            <button onclick="getWeather()">🔍</button>
+        </div>
+        <div class="weather-info" id="weatherInfo"></div>
+        <div class="temp-toggle" id="tempToggle" onclick="toggleTemperatureUnit()">Switch to Fahrenheit</div>
+        <div class="date-time" id="dateTime"></div>
+        <div class="favorites">
+            <button onclick="saveFavorite()">Save as Favorite</button>
+            <div id="favoriteCities"></div>
+        </div>
+    </div>
+
+    <script>
+        let isCelsius = true; // Track if the temperature is in Celsius or Fahrenheit
+        let favoriteCities = JSON.parse(localStorage.getItem('favoriteCities')) || [];
+
+        document.addEventListener("DOMContentLoaded", loadFavoriteCities);
+
+        async function getWeather(cityName) {
+            const city = cityName || document.getElementById('city').value;
+            if (!city) {
+                alert('Please enter a city name');
+                return;
+            }
+            const apiKey = 'b1bc5b715154f279f889086d705a7613'; // Replace with your actual API key
+            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error('City not found');
+                }
+                const data = await response.json();
+
+                const lat = data.coord.lat;
+                const lon = data.coord.lon;
+                const uvUrl = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=hourly,daily&appid=${apiKey}`;
+                const uvResponse = await fetch(uvUrl);
+                const uvData = await uvResponse.json();
+                const uvIndex = uvData.current && uvData.current.uvi !== undefined ? uvData.current.uvi : "N/A";
+
+                const weatherInfo = `
+                    <div>
+                        <p class="icon"><img src="https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png" alt="weather icon"></p>
+                        <p class="temperature" id="temperature">${data.main.temp}°C</p>
+                        <p class="city">${data.name}</p>
+                    </div>
+                    <div class="additional-info">
+                        <div>
+                            <p class="humidity">💧 ${data.main.humidity}%</p>
+                            <p>Humidity</p>
+                        </div>
+                        <div>
+                            <p class="wind-speed">🌬️ ${data.wind.speed} km/h</p>
+                            <p>Wind Speed</p>
+                        </div>
+                    </div>
+                    <p class="description">${data.weather[0].description}</p>
+                    <p class="uv-index">🌞 UV Index: ${uvIndex}</p>
+                    <p class="pressure">Pressure: ${data.main.pressure} hPa</p>
+                    <p class="visibility">Visibility: ${data.visibility / 1000} km</p>
+                `;
+                document.getElementById('weatherInfo').innerHTML = weatherInfo;
+
+                // Set background based on weather
+                changeBackground(data.weather[0].main);
+
+                // Display current date and time
+                displayDateTime(data.timezone);
+
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // Function to toggle between Celsius and Fahrenheit
+        function toggleTemperatureUnit() {
+            const tempElement = document.getElementById('temperature');
+            let currentTemp = parseFloat(tempElement.textContent);
+            if (isCelsius) {
+                // Convert to Fahrenheit
+                const fahrenheitTemp = (currentTemp * 9/5) + 32;
+                tempElement.textContent = `${fahrenheitTemp.toFixed(1)}°F`;
+                document.getElementById('tempToggle').textContent = 'Switch to Celsius';
+            } else {
+                // Convert to Celsius
+                const celsiusTemp = (currentTemp - 32) * 5/9;
+                tempElement.textContent = `${celsiusTemp.toFixed(1)}°C`;
+                document.getElementById('tempToggle').textContent = 'Switch to Fahrenheit';
+            }
+            isCelsius = !isCelsius;
+        }
+
+        // Function to change background based on weather
+        function changeBackground(weather) {
+            switch (weather) {
+                case 'Clear':
+                    document.body.style.background = 'linear-gradient(to right, #fbc2eb, #a6c1ee)';
+                    break;
+                case 'Clouds':
+                    document.body.style.background = 'linear-gradient(to right, #bdc3c7, #2c3e50)';
+                    break;
+                case 'Rain':
+                    document.body.style.background = 'linear-gradient(to right, #74ebd5, #ACB6E5)';
+                    break;
+                case 'Snow':
+                    document.body.style.background = 'linear-gradient(to right, #e6dada, #274046)';
+                    break;
+                default:
+                    document.body.style.background = 'linear-gradient(to right, #6dd5fa, #2980b9)';
+                    break;
+            }
+        }
+
+        // Function to display date and time based on city timezone
+        function displayDateTime(timezoneOffset) {
+            const dateTimeElement = document.getElementById('dateTime');
+            const now = new Date();
+            const localTime = new Date(now.getTime() + (timezoneOffset * 1000));
+            const formattedTime = localTime.toLocaleString('en-US', { timeZoneName: 'short' });
+            dateTimeElement.textContent = `Local Time: ${formattedTime}`;
+        }
+
+        // Function to save favorite cities
+        function saveFavorite() {
+            const city = document.getElementById('city').value;
+            if (!city || favoriteCities.includes(city)) {
+                return;
+            }
+            favoriteCities.push(city);
+            localStorage.setItem('favoriteCities', JSON.stringify(favoriteCities));
+            loadFavoriteCities();
+        }
+
+        // Function to load favorite cities
+        function loadFavoriteCities() {
+            const favoriteCitiesContainer = document.getElementById('favoriteCities');
+            favoriteCitiesContainer.innerHTML = '';
+            favoriteCities.forEach(city => {
+                const cityButton = document.createElement('button');
+                cityButton.textContent = city;
+                cityButton.onclick = () => getWeather(city);
+                favoriteCitiesContainer.appendChild(cityButton);
+            });
+        }
+        // Function to remove a city from favorites
+
+
+    </script>
+</body>
+</html>
